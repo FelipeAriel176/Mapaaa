@@ -1,16 +1,21 @@
 package com.example.mapa2;
 
-import android.content.Context;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
+import android.widget.Button;
 import android.widget.Toast;
 
-import androidx.activity.EdgeToEdge;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
+
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.MarkerOptions;
 
 import org.osmdroid.config.Configuration;
 import org.osmdroid.events.MapEventsReceiver;
@@ -20,67 +25,79 @@ import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.MapEventsOverlay;
 import org.osmdroid.views.overlay.Marker;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
 
-    private MapView map = null;
+    private MapView osmMapView = null;
+    private GoogleMap googleMap = null;
+    private View googleMapContainer;
     private Marker markerSeleccionado;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this);
-        setContentView(R.layout.activity_main);
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
-            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
-            return insets;
-        });
 
         Configuration.getInstance().setUserAgentValue("Mapa/ benja@gmail.com");
+        setContentView(R.layout.activity_main);
 
-        map = findViewById(R.id.map);
-        map.setTileSource(TileSourceFactory.WIKIMEDIA);
-        map.setMultiTouchControls(true); //
+        Button btnGoogle = findViewById(R.id.btnGoogle);
+        Button btnOnstreet = findViewById(R.id.btnOnstreet);
+
+        osmMapView = findViewById(R.id.osmdroidMapView);
+        osmMapView.setMultiTouchControls(true);
+        osmMapView.setTileSource(TileSourceFactory.MAPNIK);
+
+        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
+                .findFragmentById(R.id.googleMapFragment);
+        if (mapFragment != null) {
+            mapFragment.getMapAsync(this);
+            googleMapContainer = mapFragment.getView();
+        }
 
         GeoPoint startPoint = new GeoPoint(-33.498895, -70.616617);
         GeoPoint punto2 = new GeoPoint(-33.498720, -70.616130);
         GeoPoint punto3 = new GeoPoint(-33.498561, -70.615666);
 
-        map.getController().setZoom(20.0);
-        Toast.makeText(this, "Tengo el codigo de la discodia", Toast.LENGTH_SHORT).show();
+        osmMapView.getController().setZoom(18.0);
+        osmMapView.getController().setCenter(startPoint);
+        Toast.makeText(this, "Mapa listo con Google y Onstreet", Toast.LENGTH_SHORT).show();
 
-        map.getController().setCenter(startPoint);
+        int anchoIcono = 64;
+        int altoIcono = 64;
 
-        Marker maker = new Marker(map);
+        Marker maker = new Marker(osmMapView);
         maker.setPosition(startPoint);
-        maker.setTitle("Hola");
-        maker.setSnippet("Repartidor cerca");
+        maker.setTitle("Punto Inicial");
+        maker.setSnippet("Ubicación de origen");
 
-        Marker maker2 = new Marker(map);
+        Marker maker2 = new Marker(osmMapView);
         maker2.setPosition(punto2);
-        maker2.setIcon(
-                ContextCompat.getDrawable(
-                        this,
-                        R.mipmap.ic_launcher_repartidor_round)
-        );
-        maker2.setTitle("Hola");
-        maker2.setSnippet("Repartidor cerca");
+        try {
+            android.graphics.Bitmap b = android.graphics.BitmapFactory.decodeResource(getResources(), R.drawable.vendedor);
+            android.graphics.Bitmap bitmapRedimensionado = android.graphics.Bitmap.createScaledBitmap(b, anchoIcono, altoIcono, false);
+            android.widget.ImageView iv = new android.widget.ImageView(this);
+            maker2.setIcon(new android.graphics.drawable.BitmapDrawable(getResources(), bitmapRedimensionado));
+        } catch (Exception e) {
+            Log.e("MAPA", "Error al ajustar icono vendedor: " + e.getMessage());
+        }
+        maker2.setTitle("Vendedor Ambulante");
+        maker2.setSnippet("Venta de productos en la calle");
 
-        Marker maker3 = new Marker(map);
+        Marker maker3 = new Marker(osmMapView);
         maker3.setPosition(punto3);
-        maker3.setIcon(
-                ContextCompat.getDrawable(
-                        this,
-                        R.mipmap.ic_launcher_poli)
-        );
-        maker3.setTitle("Hola");
-        maker3.setSnippet("Repartidor cerca");
+        try {
+            android.graphics.Bitmap b = android.graphics.BitmapFactory.decodeResource(getResources(), R.drawable.pizza);
+            android.graphics.Bitmap bitmapRedimensionado = android.graphics.Bitmap.createScaledBitmap(b, anchoIcono, altoIcono, false);
+            maker3.setIcon(new android.graphics.drawable.BitmapDrawable(getResources(), bitmapRedimensionado));
+        } catch (Exception e) {
+            Log.e("MAPA", "Error al ajustar icono: " + e.getMessage());
+        }
+        maker3.setTitle("Pizzeria");
 
 
-        map.getOverlays().add(maker);
-        map.getOverlays().add(maker2);
-        map.getOverlays().add(maker3);
-        map.invalidate();
+        osmMapView.getOverlays().add(maker);
+        osmMapView.getOverlays().add(maker2);
+        osmMapView.getOverlays().add(maker3);
+
 
 
         MapEventsReceiver puntoSelecionado = new MapEventsReceiver() {
@@ -88,32 +105,55 @@ public class MainActivity extends AppCompatActivity {
             public boolean singleTapConfirmedHelper(GeoPoint p) {
                 double lat = p.getLatitude();
                 double lon = p.getLongitude();
-
                 Log.d("MAPA", "Latitud " + lat + " Longitud" + lon);
 
-                if (markerSeleccionado != null ) {
-                    map.getOverlays().remove(markerSeleccionado);
+                if (markerSeleccionado != null) {
+                    osmMapView.getOverlays().remove(markerSeleccionado);
                 }
 
-                markerSeleccionado = new Marker(map);
+                markerSeleccionado = new Marker(osmMapView);
                 markerSeleccionado.setPosition(p);
                 markerSeleccionado.setTitle("ACA");
-                markerSeleccionado.setAnchor(
-                        Marker.ANCHOR_CENTER,
-                        Marker.ANCHOR_BOTTOM
-                );
-                map.getOverlays().add(markerSeleccionado);
-                map.invalidate();
-
+                markerSeleccionado.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
+                osmMapView.getOverlays().add(markerSeleccionado);
+                osmMapView.invalidate();
                 return true;
             }
 
             @Override
-            public boolean longPressHelper(GeoPoint p) {
-                return false;
-            }
+            public boolean longPressHelper(GeoPoint p) { return false; }
         };
-        MapEventsOverlay eventsOverlay = new MapEventsOverlay(puntoSelecionado);
-        map.getOverlays().add(eventsOverlay);
+        osmMapView.getOverlays().add(new MapEventsOverlay(puntoSelecionado));
+        osmMapView.invalidate();
+
+        btnGoogle.setOnClickListener(v -> {
+            if (googleMapContainer != null) googleMapContainer.setVisibility(View.VISIBLE);
+            osmMapView.setVisibility(View.GONE);
+        });
+
+        btnOnstreet.setOnClickListener(v -> {
+            if (googleMapContainer != null) googleMapContainer.setVisibility(View.GONE);
+            osmMapView.setVisibility(View.VISIBLE);
+        });
+    }
+
+    @Override
+    public void onMapReady(@NonNull GoogleMap gMap) {
+        googleMap = gMap;
+        LatLng startLatLng = new LatLng(-33.498895, -70.616617);
+        googleMap.addMarker(new MarkerOptions().position(startLatLng).title("Hola - Repartidor"));
+        googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(startLatLng, 17.0f));
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (osmMapView != null) osmMapView.onResume();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (osmMapView != null) osmMapView.onPause();
     }
 }
